@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muna Business Mall | Admin Panel</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Jost:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs, doc,
+    updateDoc, deleteDoc, orderBy, query, serverTimestamp,
+    onSnapshot, arrayUnion
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+  apiKey: "AIzaSyCrRat0N6kN1ApMBUBeXRjyHOmaDzyFOY0",
+  authDomain: "project1-a73ed.firebaseapp.com",
+  projectId: "project1-a73ed",
+  storageBucket: "project1-a73ed.firebasestorage.app",
+  messagingSenderId: "137095731654",
+  appId: "1:137095731654:web:29c1271eb01a371c007ac7"
+};
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window._firebase = { db, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, orderBy, query, serverTimestamp, onSnapshot, arrayUnion };
+  window._firebaseReady = true;
+  document.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<script>
+tailwind.config={
+  theme:{
+    extend:{
+      colors:{ burgundy:"#6E1423", gold:"#C9A24B", cream:"#FBF6EE", charcoal:"#1E1B18" },
+      fontFamily:{ serif:['"Playfair Display"','serif'], sans:['Jost','sans-serif'], mono:['"JetBrains Mono"','monospace'] }
+    }
+  }
+}
+</script>
+
+<style>
+*{box-sizing:border-box;font-family:'Jost',sans-serif;}
+.serif{font-family:'Playfair Display',serif;}
+body{background:#FBF6EE;}
+.spinner{border:3px solid #f3f3f3;border-top:3px solid #6E1423;border-radius:50%;width:20px;height:20px;animation:spin 0.8s linear infinite;}
+@keyframes spin{100%{transform:rotate(360deg);}}
+.tab-btn.active{border-bottom:3px solid #6E1423;color:#6E1423;font-weight:700;}
+.chat-thread.active{background:#FBF6EE;border-left:4px solid #6E1423;}
+.order-filter-btn{background:white;color:#6E1423;}
+.order-filter-btn.active{background:#6E1423;color:white;}
+.status-pill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;}
+.stat-card{transition:.2s;}
+.stat-card:hover{transform:translateY(-3px);}
+
+/* ============================================================ */
+/* PRINT RECEIPT STYLES */
+/* ============================================================ */
+#print-receipt-wrapper{
+  display:none;
+}
+@media print{
+  @page{ margin:0; size:80mm auto; }
+  body *{ visibility:hidden; }
+  #print-receipt-wrapper, #print-receipt-wrapper *{ visibility:visible; }
+  #print-receipt-wrapper{
+    display:block !important;
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+  }
+}
+.receipt-box{
+  width:320px;
+  margin:0 auto;
+  background:#fff;
+  color:#1E1B18;
+  font-family:'Jost',sans-serif;
+  padding:24px 22px;
+}
+.receipt-dashed{
+  border-top:1.5px dashed #999;
+  margin:14px 0;
+}
+.receipt-logo{
+  width:52px; height:52px;
+  border-radius:999px;
+  background:#6E1423;
+  color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Playfair Display',serif;
+  font-size:22px; font-weight:900;
+  margin:0 auto 10px;
+}
+.receipt-barcode{
+  font-family:'JetBrains Mono',monospace;
+  letter-spacing:3px;
+  font-size:11px;
+}
+</style>
+</head>
+
+<body class="text-charcoal min-h-screen">
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center px-5">
+  <div class="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full border border-gold/30">
+    <h1 class="serif text-3xl font-bold text-center mb-1">Muna Business Mall</h1>
+    <p class="text-center text-sm text-burgundy uppercase tracking-widest mb-8">Admin Access</p>
+    <input type="password" id="admin-password" placeholder="Enter admin password"
+      class="w-full border border-gold/40 rounded-lg p-4 mb-4 outline-none focus:border-burgundy"
+      onkeydown="if(event.key==='Enter') checkPassword()">
+    <button onclick="checkPassword()" class="w-full bg-burgundy text-white py-4 rounded-lg font-bold hover:bg-black transition">
+      Log In
+    </button>
+    <p id="login-error" class="text-red-600 text-sm text-center mt-4 hidden">Incorrect password. Try again.</p>
+  </div>
+</div>
+
+<!-- ===================== ADMIN DASHBOARD ===================== -->
+<div id="admin-dashboard" class="hidden">
+
+  <!-- Header -->
+  <header class="bg-burgundy text-white sticky top-0 z-30 shadow">
+    <div class="max-w-6xl mx-auto px-5 py-4 flex justify-between items-center">
+      <div>
+        <h1 class="serif text-2xl font-bold">Muna Business Mall</h1>
+        <p class="text-xs text-gold uppercase tracking-widest">Admin Dashboard</p>
+      </div>
+      <button onclick="logout()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-semibold">
+        <i class="fa-solid fa-right-from-bracket mr-1"></i> Log Out
+      </button>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <div class="bg-white border-b border-gold/20 sticky top-[72px] z-20">
+    <div class="max-w-6xl mx-auto px-5 flex gap-8 overflow-x-auto">
+      <button id="tab-products-btn" onclick="switchTab('products')" class="tab-btn active py-4 text-sm whitespace-nowrap">
+        <i class="fa-solid fa-boxes-stacked mr-1"></i> Products
+      </button>
+      <button id="tab-orders-btn" onclick="switchTab('orders')" class="tab-btn py-4 text-sm relative whitespace-nowrap">
+        <i class="fa-solid fa-receipt mr-1"></i> Orders
+        <span id="orders-unread-badge" class="hidden absolute -top-1 -right-4 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+      </button>
+      <button id="tab-chats-btn" onclick="switchTab('chats')" class="tab-btn py-4 text-sm relative whitespace-nowrap">
+        <i class="fa-solid fa-comment-dots mr-1"></i> Customer Chats
+        <span id="chats-unread-badge" class="hidden absolute -top-1 -right-4 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================== PRODUCTS TAB ===================== -->
+  <div id="tab-products" class="max-w-6xl mx-auto px-5 py-8">
+
+    <!-- Add / Edit Product Form -->
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-10 border border-gold/20">
+      <h2 id="form-title" class="serif text-2xl font-bold mb-6">Add New Product</h2>
+
+      <form id="product-form" class="grid md:grid-cols-2 gap-5" onsubmit="return false;">
+        <input type="hidden" id="product-id">
+
+        <div>
+          <label class="block text-sm font-semibold mb-2">Product Name</label>
+          <input type="text" id="p-name" placeholder="e.g. Foreign Rice 50kg" required
+            class="w-full border border-gold/40 rounded-lg p-3 outline-none focus:border-burgundy">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-2">Category</label>
+          <select id="p-category" class="w-full border border-gold/40 rounded-lg p-3 outline-none focus:border-burgundy">
+            <option value="rice">Rice</option>
+            <option value="beans">Beans</option>
+            <option value="crayfish">Crayfish</option>
+            <option value="fish">Fish & Seafood</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-2">Price (₦)</label>
+          <input type="number" id="p-price" placeholder="e.g. 18000" required
+            class="w-full border border-gold/40 rounded-lg p-3 outline-none focus:border-burgundy">
+        </div>
+
+        <div>
+          <label class="block text-sm font-semibold mb-2">Size / Variant</label>
+          <input type="text" id="p-size" placeholder="e.g. 37 to 42, or S to XL"
+            class="w-full border border-gold/40 rounded-lg p-3 outline-none focus:border-burgundy">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-semibold mb-2">Available Colours (optional)</label>
+          <input type="text" id="p-colors" placeholder="e.g. White, Red, Black, Cream"
+            class="w-full border border-gold/40 rounded-lg p-3 outline-none focus:border-burgundy">
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-semibold mb-2">Badge (optional)</label>
+          <select id="p-badge" class="w-full border border-gold/40 rounded-lg p-3 outline-none focus:border-burgundy">
+            <option value="">None</option>
+            <option value="NEW ARRIVAL">New Arrival</option>
+            <option value="POPULAR">Popular</option>
+            <option value="BEST SELLER">Best Seller</option>
+            <option value="SOLD OUT">Sold Out</option>
+          </select>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-sm font-semibold mb-2">Product Image</label>
+          <input type="file" id="p-image" accept="image/*"
+            class="w-full border border-gold/40 rounded-lg p-3 outline-none">
+          <div id="upload-status" class="text-xs text-gray-500 mt-2 hidden"></div>
+          <div id="image-preview" class="mt-3 hidden">
+            <img id="preview-img" class="w-32 h-32 object-cover rounded-lg border border-gold/30">
+          </div>
+        </div>
+
+        <div class="md:col-span-2 flex gap-3 mt-2">
+          <button onclick="saveProduct()" id="save-btn"
+            class="flex-1 bg-burgundy text-white py-4 rounded-lg font-bold hover:bg-black transition flex items-center justify-center gap-2">
+            <span id="save-btn-text">Save Product</span>
+          </button>
+          <button onclick="resetForm()" type="button"
+            class="px-6 py-4 border border-gold/40 rounded-lg font-semibold hover:bg-gold/10 transition">
+            Clear
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Product List -->
+    <div class="flex justify-between items-center mb-5">
+      <h2 class="serif text-2xl font-bold">Current Products</h2>
+      <span id="product-count" class="text-sm text-gray-500"></span>
+    </div>
+
+    <div id="loading-products" class="text-center py-10">
+      <div class="spinner mx-auto"></div>
+      <p class="text-gray-500 mt-3 text-sm">Loading products...</p>
+    </div>
+
+    <div id="products-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    <p id="no-products" class="hidden text-center text-gray-500 py-10">No products yet. Add your first one above.</p>
+
+  </div>
+
+  <!-- ===================== ORDERS TAB ===================== -->
+  <div id="tab-orders" class="max-w-6xl mx-auto px-5 py-8 hidden">
+
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="serif text-2xl font-bold">Customer Orders</h2>
+      <button onclick="exportOrdersCSV()" class="bg-charcoal text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-black flex items-center gap-2">
+        <i class="fa-solid fa-file-csv"></i> Export CSV
+      </button>
+    </div>
+
+    <!-- STATS DASHBOARD -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="stat-card bg-white rounded-xl shadow border border-gold/20 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Total Orders</p>
+        <p id="stat-total-orders" class="text-2xl font-bold text-charcoal mt-1">0</p>
+      </div>
+      <div class="stat-card bg-white rounded-xl shadow border border-gold/20 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue (Paid)</p>
+        <p id="stat-revenue" class="text-2xl font-bold text-green-700 mt-1">₦0</p>
+      </div>
+      <div class="stat-card bg-white rounded-xl shadow border border-gold/20 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Pending Payment</p>
+        <p id="stat-pending" class="text-2xl font-bold text-yellow-600 mt-1">0</p>
+      </div>
+      <div class="stat-card bg-white rounded-xl shadow border border-gold/20 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Unfulfilled</p>
+        <p id="stat-unfulfilled" class="text-2xl font-bold text-burgundy mt-1">0</p>
+      </div>
+    </div>
+
+    <!-- SEARCH + FILTERS -->
+    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+      <div class="relative flex-1 max-w-sm">
+        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        <input type="text" id="order-search" oninput="renderOrdersList()" placeholder="Search by reference or email..."
+          class="w-full border border-gold/30 rounded-lg p-3 pl-11 outline-none focus:border-burgundy bg-white">
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="setOrderFilter('all')" id="order-filter-all" class="order-filter-btn active px-4 py-2 rounded-lg text-sm font-semibold border border-burgundy">All</button>
+        <button onclick="setOrderFilter('pending_verification')" id="order-filter-pending_verification" class="order-filter-btn px-4 py-2 rounded-lg text-sm font-semibold border border-burgundy">Awaiting Payment Check</button>
+        <button onclick="setOrderFilter('paid')" id="order-filter-paid" class="order-filter-btn px-4 py-2 rounded-lg text-sm font-semibold border border-burgundy">Paid</button>
+        <button onclick="setOrderFilter('unfulfilled')" id="order-filter-unfulfilled" class="order-filter-btn px-4 py-2 rounded-lg text-sm font-semibold border border-burgundy">Unfulfilled</button>
+      </div>
+    </div>
+
+    <span id="order-count" class="text-sm text-gray-500"></span>
+
+    <div id="orders-loading" class="text-center py-10">
+      <div class="spinner mx-auto"></div>
+      <p class="text-gray-500 mt-3 text-sm">Loading orders...</p>
+    </div>
+
+    <div id="orders-list" class="space-y-4 mt-4"></div>
+    <p id="no-orders" class="hidden text-center text-gray-500 py-10">No orders yet.</p>
+  </div>
+
+  <!-- ===================== CUSTOMER CHATS TAB ===================== -->
+  <div id="tab-chats" class="max-w-6xl mx-auto px-5 py-8 hidden">
+    <h2 class="serif text-2xl font-bold mb-6">Customer Chats</h2>
+
+    <div class="grid md:grid-cols-3 gap-5" style="min-height:60vh;">
+
+      <div class="bg-white rounded-2xl shadow-lg border border-gold/20 overflow-hidden md:col-span-1">
+        <div class="p-4 border-b bg-gold/10 font-semibold text-sm">Conversations</div>
+        <div id="chats-list" class="divide-y divide-gold/10 overflow-y-auto" style="max-height:65vh;"></div>
+        <p id="no-chats" class="hidden text-center text-gray-500 py-10 text-sm">No customer chats yet.</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-lg border border-gold/20 flex flex-col md:col-span-2">
+        <div id="active-chat-header" class="p-4 border-b bg-gold/10 font-semibold text-sm">
+          Select a conversation
+        </div>
+        <div id="active-chat-messages" class="flex-1 overflow-y-auto p-5 space-y-3" style="max-height:55vh;">
+          <p class="text-center text-gray-400 text-sm">No conversation selected.</p>
+        </div>
+        <div class="border-t p-4 flex gap-2">
+          <input type="text" id="admin-reply-input" placeholder="Type your reply..." disabled
+            class="flex-1 border rounded-lg p-3 outline-none disabled:bg-gray-100"
+            onkeydown="if(event.key==='Enter') sendAdminReply()">
+          <button onclick="sendAdminReply()" id="admin-reply-btn" disabled
+            class="bg-burgundy text-white px-5 rounded-lg hover:bg-black disabled:opacity-40">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="hidden fixed bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-auto z-[200] bg-charcoal text-white px-6 py-4 rounded-lg shadow-lg items-center gap-3">
+  <i id="toast-icon" class="fa-solid fa-circle-check text-green-400"></i>
+  <span id="toast-text"></span>
+</div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div id="confirm-modal" class="hidden fixed inset-0 z-[150] bg-black/50 flex items-center justify-center px-5">
+  <div class="bg-white rounded-2xl p-6 max-w-sm w-full">
+    <h3 class="font-bold text-lg mb-2">Delete Product?</h3>
+    <p class="text-gray-600 text-sm mb-6">This will permanently remove the product listing. This can't be undone.</p>
+    <div class="flex gap-3">
+      <button onclick="confirmDelete()" class="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700">Delete</button>
+      <button onclick="closeConfirm()" class="flex-1 border border-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-100">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- PRINT RECEIPT (hidden on screen, shown only during print) -->
+<!-- ============================================================ -->
+<div id="print-receipt-wrapper">
+  <div class="receipt-box" id="print-receipt-content"></div>
+</div>
+
+<!-- Notification sound -->
+<audio id="notif-sound" preload="auto">
+  <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+</audio>
+
+<script>
+// ============================================================
+// ⚠️ SET YOUR ADMIN PASSWORD HERE
+// ============================================================
+const ADMIN_PASSWORD = "MunaAdmin2026";
+
+// ============================================================
+// ⚠️ CLOUDINARY CONFIG
+// ============================================================
+const CLOUDINARY_CLOUD_NAME = "xhkfiry2";
+const CLOUDINARY_UPLOAD_PRESET = "Project1";
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+let editingId = null;
+let deleteTargetId = null;
+let selectedImageFile = null;
+
+function checkPassword(){
+  const input = document.getElementById('admin-password').value;
+  if(input === ADMIN_PASSWORD){
+    sessionStorage.setItem('mbm_admin_auth', 'true');
+    showDashboard();
+  } else {
+    document.getElementById('login-error').classList.remove('hidden');
+  }
+}
+
+function logout(){
+  sessionStorage.removeItem('mbm_admin_auth');
+  document.getElementById('admin-dashboard').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('admin-password').value = '';
+}
+
+function showDashboard(){
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-dashboard').classList.remove('hidden');
+  loadProducts();
+  initChatsListener();
+  initOrdersListener();
+}
+
+if(sessionStorage.getItem('mbm_admin_auth') === 'true'){
+  document.addEventListener('DOMContentLoaded', showDashboard);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('p-image').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(file){
+      selectedImageFile = file;
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        document.getElementById('preview-img').src = ev.target.result;
+        document.getElementById('image-preview').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+});
+
+function showToast(text, isError){
+  const toast = document.getElementById('toast');
+  const icon = document.getElementById('toast-icon');
+  document.getElementById('toast-text').textContent = text;
+  icon.className = isError ? 'fa-solid fa-circle-exclamation text-red-400' : 'fa-solid fa-circle-check text-green-400';
+  toast.classList.remove('hidden'); toast.classList.add('flex');
+  setTimeout(() => { toast.classList.add('hidden'); toast.classList.remove('flex'); }, 3000);
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(tab){
+  document.getElementById('tab-products').classList.toggle('hidden', tab !== 'products');
+  document.getElementById('tab-orders').classList.toggle('hidden', tab !== 'orders');
+  document.getElementById('tab-chats').classList.toggle('hidden', tab !== 'chats');
+  document.getElementById('tab-products-btn').classList.toggle('active', tab === 'products');
+  document.getElementById('tab-orders-btn').classList.toggle('active', tab === 'orders');
+  document.getElementById('tab-chats-btn').classList.toggle('active', tab === 'chats');
+}
+
+function resetForm(){
+  editingId = null;
+  selectedImageFile = null;
+  document.getElementById('product-form').reset();
+  document.getElementById('image-preview').classList.add('hidden');
+  document.getElementById('upload-status').classList.add('hidden');
+  document.getElementById('form-title').textContent = 'Add New Product';
+  document.getElementById('save-btn-text').textContent = 'Save Product';
+}
+
+// ============================================================
+// UPLOAD IMAGE TO CLOUDINARY
+// ============================================================
+async function uploadToCloudinary(file){
+  const statusEl = document.getElementById('upload-status');
+  statusEl.classList.remove('hidden');
+  statusEl.textContent = 'Uploading image to Cloudinary...';
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('folder', 'products');
+
+  const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+    method: 'POST',
+    body: formData
+  });
+
+  if(!response.ok){
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || 'Cloudinary upload failed');
+  }
+
+  const data = await response.json();
+  statusEl.textContent = 'Image uploaded successfully.';
+  return data.secure_url;
+}
+
+async function saveProduct(){
+  const name = document.getElementById('p-name').value.trim();
+  const category = document.getElementById('p-category').value;
+  const price = Number(document.getElementById('p-price').value);
+  const size = document.getElementById('p-size').value.trim();
+  const colors = document.getElementById('p-colors').value.trim();
+  const badge = document.getElementById('p-badge').value;
+
+  if(!name || !price){
+    showToast('Please fill in product name and price.', true);
+    return;
+  }
+
+  const saveBtn = document.getElementById('save-btn');
+  const saveBtnText = document.getElementById('save-btn-text');
+  saveBtn.disabled = true;
+  saveBtnText.innerHTML = '<span class="spinner" style="border-color:#fff3;border-top-color:#fff;"></span>';
+
+  try {
+    const { db, collection, addDoc, doc, updateDoc, serverTimestamp } = window._firebase;
+
+    let imageUrl = null;
+
+    if(selectedImageFile){
+      imageUrl = await uploadToCloudinary(selectedImageFile);
+    }
+
+    const productData = {
+      name, category, price, size, colors, badge,
+      updatedAt: serverTimestamp()
+    };
+    if(imageUrl) productData.imageUrl = imageUrl;
+
+    if(editingId){
+      await updateDoc(doc(db, 'products', editingId), productData);
+      showToast('Product updated successfully!');
+    } else {
+      productData.createdAt = serverTimestamp();
+      if(!imageUrl) productData.imageUrl = '';
+      await addDoc(collection(db, 'products'), productData);
+      showToast('Product added successfully!');
+    }
+
+    resetForm();
+    loadProducts();
+
+  } catch(err){
+    console.error(err);
+    showToast('Error saving product: ' + err.message, true);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtnText.textContent = 'Save Product';
+  }
+}
+
+async function loadProducts(){
+  const { db, collection, getDocs, query, orderBy } = window._firebase;
+  const listEl = document.getElementById('products-list');
+  const loadingEl = document.getElementById('loading-products');
+  const noProductsEl = document.getElementById('no-products');
+
+  loadingEl.classList.remove('hidden');
+  listEl.innerHTML = '';
+
+  try {
+    const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    loadingEl.classList.add('hidden');
+    document.getElementById('product-count').textContent = `${snapshot.size} product${snapshot.size !== 1 ? 's' : ''}`;
+
+    if(snapshot.empty){
+      noProductsEl.classList.remove('hidden');
+      return;
+    }
+    noProductsEl.classList.add('hidden');
+
+    snapshot.forEach(docSnap => {
+      const p = docSnap.data();
+      const id = docSnap.id;
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-xl shadow border border-gold/20 overflow-hidden';
+      card.innerHTML = `
+        <div class="h-40 bg-gold/10 flex items-center justify-center overflow-hidden">
+          ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-image text-4xl text-gold/50"></i>`}
+        </div>
+        <div class="p-4">
+          ${p.badge ? `<span class="text-xs bg-burgundy text-white px-2 py-1 rounded-full">${p.badge}</span>` : ''}
+          <h3 class="font-bold mt-2">${p.name}</h3>
+          <p class="text-xs text-gray-500 mt-1">Size: ${p.size || '—'}</p>
+          ${p.colors ? `<p class="text-xs text-gray-500">Colours: ${p.colors}</p>` : ''}
+          <p class="text-burgundy font-bold text-lg mt-2">₦${Number(p.price).toLocaleString()}</p>
+          <div class="flex gap-2 mt-4">
+            <button onclick='editProduct("${id}")' class="flex-1 border border-burgundy text-burgundy py-2 rounded-lg text-sm hover:bg-burgundy hover:text-white">
+              <i class="fa-solid fa-pen mr-1"></i> Edit
+            </button>
+            <button onclick="openConfirm('${id}')" class="flex-1 border border-red-500 text-red-500 py-2 rounded-lg text-sm hover:bg-red-500 hover:text-white">
+              <i class="fa-solid fa-trash mr-1"></i> Delete
+            </button>
+          </div>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+
+    window._loadedProducts = {};
+    snapshot.forEach(docSnap => { window._loadedProducts[docSnap.id] = docSnap.data(); });
+
+  } catch(err){
+    console.error(err);
+    loadingEl.classList.add('hidden');
+    showToast('Error loading products: ' + err.message, true);
+  }
+}
+
+function editProduct(id){
+  const p = window._loadedProducts[id];
+  if(!p) return;
+  editingId = id;
+  document.getElementById('p-name').value = p.name || '';
+  document.getElementById('p-category').value = p.category || 'rice';
+  document.getElementById('p-price').value = p.price || '';
+  document.getElementById('p-size').value = p.size || '';
+  document.getElementById('p-colors').value = p.colors || '';
+  document.getElementById('p-badge').value = p.badge || '';
+  if(p.imageUrl){
+    document.getElementById('preview-img').src = p.imageUrl;
+    document.getElementById('image-preview').classList.remove('hidden');
+  }
+  document.getElementById('form-title').textContent = 'Edit Product';
+  document.getElementById('save-btn-text').textContent = 'Update Product';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openConfirm(id){
+  deleteTargetId = id;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+}
+function closeConfirm(){
+  deleteTargetId = null;
+  document.getElementById('confirm-modal').classList.add('hidden');
+}
+
+async function confirmDelete(){
+  if(!deleteTargetId) return;
+  const { db, doc, deleteDoc } = window._firebase;
+  try {
+    await deleteDoc(doc(db, 'products', deleteTargetId));
+    showToast('Product deleted.');
+    closeConfirm();
+    loadProducts();
+  } catch(err){
+    console.error(err);
+    showToast('Error deleting product: ' + err.message, true);
+    closeConfirm();
+  }
+}
+
+// ============================================================
+// ORDERS
+// ============================================================
+let allOrders = {};
+let currentOrderFilter = 'all';
+let isFirstOrdersLoad = true;
+
+function initOrdersListener(){
+  const { db, collection, onSnapshot, query, orderBy } = window._firebase;
+
+  try {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    onSnapshot(q, (snapshot) => {
+      const newOrders = {};
+      let hasNewIncoming = false;
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        newOrders[docSnap.id] = data;
+        if(!isFirstOrdersLoad && !Object.keys(allOrders).includes(docSnap.id)){
+          hasNewIncoming = true;
+        }
+      });
+
+      allOrders = newOrders;
+      document.getElementById('orders-loading').classList.add('hidden');
+      renderOrdersList();
+      renderOrderStats();
+      updateOrdersBadge();
+
+      if(hasNewIncoming){
+        playNotificationSound();
+        showToast('New order received!');
+      }
+      isFirstOrdersLoad = false;
+    }, (err) => {
+      console.error(err);
+      document.getElementById('orders-loading').classList.add('hidden');
+      document.getElementById('orders-list').innerHTML = `<p class="text-red-500 text-sm p-4">Could not load orders.</p>`;
+    });
+  } catch(err){
+    console.error(err);
+  }
+}
+
+function renderOrderStats(){
+  const orders = Object.values(allOrders);
+  const total = orders.length;
+  const revenue = orders.filter(o => o.paymentStatus === 'paid').reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+  const pending = orders.filter(o => (o.paymentStatus || 'pending_verification') === 'pending_verification').length;
+  const unfulfilled = orders.filter(o => (o.fulfillmentStatus || 'pending') !== 'fulfilled').length;
+
+  document.getElementById('stat-total-orders').textContent = total;
+  document.getElementById('stat-revenue').textContent = '₦' + revenue.toLocaleString();
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-unfulfilled').textContent = unfulfilled;
+}
+
+function setOrderFilter(filter){
+  currentOrderFilter = filter;
+  document.querySelectorAll('.order-filter-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('order-filter-' + filter).classList.add('active');
+  renderOrdersList();
+}
+
+function orderMatchesFilter(order){
+  if(currentOrderFilter === 'all') return true;
+  if(currentOrderFilter === 'pending_verification') return (order.paymentStatus || 'pending_verification') === 'pending_verification';
+  if(currentOrderFilter === 'paid') return order.paymentStatus === 'paid';
+  if(currentOrderFilter === 'unfulfilled') return (order.fulfillmentStatus || 'pending') !== 'fulfilled';
+  return true;
+}
+
+function orderMatchesSearch(order){
+  const term = document.getElementById('order-search').value.trim().toLowerCase();
+  if(!term) return true;
+  const ref = (order.paystackRef || '').toLowerCase();
+  const email = (order.customerEmail || '').toLowerCase();
+  return ref.includes(term) || email.includes(term);
+}
+
+function formatOrderDate(ts){
+  if(!ts || !ts.toDate) return '—';
+  const d = ts.toDate();
+  return d.toLocaleString('en-NG', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function paymentBadge(status){
+  if(status === 'paid') return `<span class="status-pill bg-green-100 text-green-700">Paid</span>`;
+  return `<span class="status-pill bg-yellow-100 text-yellow-700">Pending Verification</span>`;
+}
+function fulfillmentBadge(status){
+  if(status === 'fulfilled') return `<span class="status-pill bg-blue-100 text-blue-700">Fulfilled</span>`;
+  return `<span class="status-pill bg-gray-200 text-gray-600">Not Fulfilled</span>`;
+}
+
+function itemImageHTML(it){
+  if(it.imageUrl){
+    return `<img src="${it.imageUrl}" class="w-14 h-14 rounded-lg object-cover border border-gold/20">`;
+  }
+  return `<div class="w-14 h-14 rounded-lg bg-gold/10 flex items-center justify-center border border-gold/20"><i class="fa-solid fa-image text-gold/50"></i></div>`;
+}
+
+function renderOrdersList(){
+  const listEl = document.getElementById('orders-list');
+  const noOrdersEl = document.getElementById('no-orders');
+  const ids = Object.keys(allOrders)
+    .filter(id => orderMatchesFilter(allOrders[id]))
+    .filter(id => orderMatchesSearch(allOrders[id]));
+
+  document.getElementById('order-count').textContent =
+    `${ids.length} order${ids.length !== 1 ? 's' : ''}${currentOrderFilter !== 'all' ? ' (filtered)' : ''}`;
+
+  if(ids.length === 0){
+    listEl.innerHTML = '';
+    noOrdersEl.classList.remove('hidden');
+    return;
+  }
+  noOrdersEl.classList.add('hidden');
+
+  listEl.innerHTML = ids.map(id => {
+    const o = allOrders[id];
+    const paymentStatus = o.paymentStatus || 'pending_verification';
+    const fulfillmentStatus = o.fulfillmentStatus || 'pending';
+    const items = o.items || [];
+
+    const itemsHTML = items.map(it => `
+      <div class="flex items-center gap-3 py-2">
+        ${itemImageHTML(it)}
+        <div class="flex-1">
+          <p class="text-sm font-medium">${it.name}</p>
+          <p class="text-xs text-gray-500">Qty: ${it.qty} × ₦${Number(it.price).toLocaleString()}</p>
+        </div>
+        <span class="text-sm font-semibold">₦${Number(it.price * it.qty).toLocaleString()}</span>
+      </div>
+    `).join('');
+
+    return `
+      <div class="bg-white rounded-xl shadow border border-gold/20 p-5">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
+          <div>
+            <p class="font-bold">Ref: ${o.paystackRef || '—'}</p>
+            <p class="text-sm text-gray-500">${o.customerEmail || 'No email'}</p>
+            <p class="text-xs text-gray-400 mt-1">${formatOrderDate(o.createdAt)}</p>
+          </div>
+          <div class="flex gap-2 flex-wrap sm:justify-end">
+            ${paymentBadge(paymentStatus)}
+            ${fulfillmentBadge(fulfillmentStatus)}
+          </div>
+        </div>
+
+        <div class="border-t border-b border-gold/10 divide-y divide-gold/10 my-2">
+          ${itemsHTML || '<p class="text-sm text-gray-400 py-2">No item details.</p>'}
+        </div>
+
+        <div class="flex justify-between items-center mb-4 mt-2">
+          <span class="text-sm text-gray-500">Total</span>
+          <span class="text-burgundy font-bold text-xl">₦${Number(o.totalAmount || 0).toLocaleString()}</span>
+        </div>
+
+        <div class="flex gap-3 flex-wrap">
+          ${paymentStatus === 'paid'
+            ? `<button onclick="updateOrderField('${id}','paymentStatus','pending_verification')" class="flex-1 min-w-[140px] border border-gold/40 text-charcoal py-2.5 rounded-lg text-sm font-semibold hover:bg-gold/10">Mark as Pending</button>`
+            : `<button onclick="updateOrderField('${id}','paymentStatus','paid')" class="flex-1 min-w-[140px] bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700">Mark as Paid</button>`
+          }
+          ${fulfillmentStatus === 'fulfilled'
+            ? `<button onclick="updateOrderField('${id}','fulfillmentStatus','pending')" class="flex-1 min-w-[140px] border border-gold/40 text-charcoal py-2.5 rounded-lg text-sm font-semibold hover:bg-gold/10">Mark as Unfulfilled</button>`
+            : `<button onclick="updateOrderField('${id}','fulfillmentStatus','fulfilled')" class="flex-1 min-w-[140px] bg-burgundy text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-black">Mark as Fulfilled</button>`
+          }
+          <button onclick="printReceipt('${id}')" class="flex-1 min-w-[140px] border border-charcoal text-charcoal py-2.5 rounded-lg text-sm font-semibold hover:bg-charcoal hover:text-white">
+            <i class="fa-solid fa-print mr-1"></i> Print Receipt
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function updateOrderField(orderId, field, value){
+  const { db, doc, updateDoc } = window._firebase;
+  try {
+    await updateDoc(doc(db, 'orders', orderId), { [field]: value });
+    showToast('Order updated.');
+  } catch(err){
+    console.error(err);
+    showToast('Error updating order: ' + err.message, true);
+  }
+}
+
+function updateOrdersBadge(){
+  const count = Object.values(allOrders).filter(o =>
+    (o.paymentStatus || 'pending_verification') === 'pending_verification' ||
+    (o.fulfillmentStatus || 'pending') !== 'fulfilled'
+  ).length;
+  const badge = document.getElementById('orders-unread-badge');
+  if(count > 0){
+    badge.textContent = count;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+// ============================================================
+// PRINT RECEIPT — pulls the order fresh from allOrders by ID,
+// so there's no risk of corrupted JSON in an inline attribute.
+// ============================================================
+function printReceipt(orderId){
+  const o = allOrders[orderId];
+  if(!o){
+    showToast('Could not find order to print.', true);
+    return;
+  }
+
+  const items = o.items || [];
+  const subtotal = items.reduce((sum, it) => sum + (Number(it.price) * Number(it.qty)), 0);
+  const total = Number(o.totalAmount || subtotal);
+  const discount = subtotal - total;
+
+  const itemsRows = items.map(it => `
+    <tr>
+      <td style="padding:5px 0;font-size:12.5px;">${it.name}</td>
+      <td style="padding:5px 0;font-size:12.5px;text-align:center;">${it.qty}</td>
+      <td style="padding:5px 0;font-size:12.5px;text-align:right;">₦${Number(it.price * it.qty).toLocaleString()}</td>
+    </tr>
+  `).join('');
+
+  const paymentStatus = o.paymentStatus || 'pending_verification';
+  const dateStr = o.createdAt && o.createdAt.toDate
+    ? o.createdAt.toDate().toLocaleString('en-NG', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : new Date().toLocaleString('en-NG', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  document.getElementById('print-receipt-content').innerHTML = `
+    <div style="text-align:center;">
+      <div class="receipt-logo">MB</div>
+      <h2 class="serif" style="font-size:20px;font-weight:900;margin:0;">Muna Business Mall</h2>
+      <p style="font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:#6E1423;margin:2px 0 0;">Fresh • Quality • Affordable</p>
+    </div>
+
+    <div class="receipt-dashed"></div>
+
+    <table style="width:100%;font-size:12px;color:#444;">
+      <tr>
+        <td style="padding:2px 0;">Date</td>
+        <td style="padding:2px 0;text-align:right;font-weight:600;">${dateStr}</td>
+      </tr>
+      <tr>
+        <td style="padding:2px 0;">Reference</td>
+        <td style="padding:2px 0;text-align:right;font-weight:600;">${o.paystackRef || '—'}</td>
+      </tr>
+      <tr>
+        <td style="padding:2px 0;">Customer</td>
+        <td style="padding:2px 0;text-align:right;font-weight:600;word-break:break-all;">${o.customerEmail || '—'}</td>
+      </tr>
+      <tr>
+        <td style="padding:2px 0;">Status</td>
+        <td style="padding:2px 0;text-align:right;font-weight:700;color:${paymentStatus === 'paid' ? '#16a34a' : '#ca8a04'};">
+          ${paymentStatus === 'paid' ? 'PAID' : 'PENDING VERIFICATION'}
+        </td>
+      </tr>
+    </table>
+
+    <div class="receipt-dashed"></div>
+
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:1.5px solid #1E1B18;">
+          <th style="text-align:left;padding-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Item</th>
+          <th style="text-align:center;padding-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Qty</th>
+          <th style="text-align:right;padding-bottom:6px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${itemsRows || '<tr><td colspan="3" style="padding:10px 0;text-align:center;color:#999;">No item details</td></tr>'}</tbody>
+    </table>
+
+    <div class="receipt-dashed"></div>
+
+    <table style="width:100%;font-size:13px;">
+      <tr>
+        <td style="padding:3px 0;color:#555;">Subtotal</td>
+        <td style="padding:3px 0;text-align:right;">₦${subtotal.toLocaleString()}</td>
+      </tr>
+      ${discount > 0 ? `
+      <tr>
+        <td style="padding:3px 0;color:#16a34a;">Discount</td>
+        <td style="padding:3px 0;text-align:right;color:#16a34a;">-₦${discount.toLocaleString()}</td>
+      </tr>` : ''}
+      <tr>
+        <td style="padding:8px 0 0;font-size:17px;font-weight:900;">TOTAL</td>
+        <td style="padding:8px 0 0;font-size:17px;font-weight:900;text-align:right;">₦${total.toLocaleString()}</td>
+      </tr>
+    </table>
+
+    <div class="receipt-dashed"></div>
+
+    <div style="text-align:center;">
+      <p class="receipt-barcode">*${(o.paystackRef || 'NOREF').toUpperCase()}*</p>
+      <p style="font-size:13px;font-weight:700;margin-top:14px;">Thank you for shopping with us!</p>
+      <p style="font-size:11px;color:#777;margin-top:4px;">+234 915 531 1480 &nbsp;•&nbsp; munabusinessmall@gmail.com</p>
+      <p style="font-size:10px;color:#aaa;margin-top:10px;">Please retain this receipt for pickup or exchange.</p>
+    </div>
+  `;
+
+  // Give the browser a moment to paint before triggering print
+  setTimeout(() => window.print(), 50);
+}
+
+// ============================================================
+// EXPORT ORDERS TO CSV
+// ============================================================
+function exportOrdersCSV(){
+  const orders = Object.values(allOrders);
+  if(orders.length === 0){
+    showToast('No orders to export.', true);
+    return;
+  }
+
+  const headers = ['Reference', 'Email', 'Items', 'Total (NGN)', 'Payment Status', 'Fulfillment Status', 'Date'];
+  const rows = orders.map(o => {
+    const itemsStr = (o.items || []).map(it => `${it.name} x${it.qty}`).join('; ');
+    const date = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate().toLocaleString('en-NG') : '';
+    return [
+      o.paystackRef || '',
+      o.customerEmail || '',
+      itemsStr,
+      o.totalAmount || 0,
+      o.paymentStatus || 'pending_verification',
+      o.fulfillmentStatus || 'pending',
+      date
+    ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+  });
+
+  const csvContent = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `muna-business-mall-orders-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  showToast('Orders exported successfully!');
+}
+
+// ============================================================
+// CUSTOMER CHATS
+// ============================================================
+let allChats = {};
+let activeChatId = null;
+let knownChatIds = new Set();
+let isFirstChatsLoad = true;
+
+function initChatsListener(){
+  const { db, collection, onSnapshot, query, orderBy } = window._firebase;
+
+  try {
+    const q = query(collection(db, 'chats'), orderBy('lastMessageAt', 'desc'));
+    onSnapshot(q, (snapshot) => {
+      const newChats = {};
+      let unreadCount = 0;
+      let hasNewIncoming = false;
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        newChats[docSnap.id] = data;
+        if(data.unreadByAdmin) unreadCount++;
+      });
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const msgCount = data.messages ? data.messages.length : 0;
+        const key = docSnap.id + '_' + msgCount;
+        if(!isFirstChatsLoad && data.unreadByAdmin && !knownChatIds.has(key)){
+          hasNewIncoming = true;
+        }
+        knownChatIds.add(key);
+      });
+
+      allChats = newChats;
+      renderChatsList();
+      updateChatsBadge(unreadCount);
+
+      if(hasNewIncoming){
+        playNotificationSound();
+      }
+
+      if(activeChatId && allChats[activeChatId]){
+        renderActiveChat(activeChatId);
+      }
+
+      isFirstChatsLoad = false;
+    }, (err) => {
+      console.error(err);
+      document.getElementById('chats-list').innerHTML = `<p class="text-red-500 text-sm p-4">Could not load chats.</p>`;
+    });
+  } catch(err){
+    console.error(err);
+  }
+}
+
+function updateChatsBadge(count){
+  const badge = document.getElementById('chats-unread-badge');
+  if(count > 0){
+    badge.textContent = count;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function playNotificationSound(){
+  const audio = document.getElementById('notif-sound');
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
+
+function renderChatsList(){
+  const listEl = document.getElementById('chats-list');
+  const noChatsEl = document.getElementById('no-chats');
+  const ids = Object.keys(allChats);
+
+  if(ids.length === 0){
+    listEl.innerHTML = '';
+    noChatsEl.classList.remove('hidden');
+    return;
+  }
+  noChatsEl.classList.add('hidden');
+
+  listEl.innerHTML = ids.map(id => {
+    const chat = allChats[id];
+    const messages = chat.messages || [];
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    const preview = lastMsg ? (lastMsg.text.length > 40 ? lastMsg.text.slice(0, 40) + '…' : lastMsg.text) : 'No messages yet';
+    const isActive = id === activeChatId;
+    const isUnread = !!chat.unreadByAdmin;
+
+    return `
+      <div onclick="openChatThread('${id}')" class="chat-thread p-4 cursor-pointer hover:bg-gold/5 ${isActive ? 'active' : ''}">
+        <div class="flex justify-between items-center">
+          <span class="font-semibold text-sm">Customer ${id.slice(-5)}</span>
+          ${isUnread ? '<span class="w-2.5 h-2.5 bg-red-600 rounded-full"></span>' : ''}
+        </div>
+        <p class="text-xs text-gray-500 mt-1 truncate">${preview}</p>
+      </div>
+    `;
+  }).join('');
+}
+
+function openChatThread(chatId){
+  activeChatId = chatId;
+  const { db, doc, updateDoc } = window._firebase;
+
+  updateDoc(doc(db, 'chats', chatId), { unreadByAdmin: false }).catch(()=>{});
+
+  document.getElementById('admin-reply-input').disabled = false;
+  document.getElementById('admin-reply-btn').disabled = false;
+
+  renderChatsList();
+  renderActiveChat(chatId);
+}
+
+function renderActiveChat(chatId){
+  const chat = allChats[chatId];
+  if(!chat) return;
+
+  document.getElementById('active-chat-header').textContent = `Customer ${chatId.slice(-5)}`;
+
+  const messages = chat.messages || [];
+  const container = document.getElementById('active-chat-messages');
+
+  if(messages.length === 0){
+    container.innerHTML = `<p class="text-center text-gray-400 text-sm">No messages yet.</p>`;
+    return;
+  }
+
+  container.innerHTML = messages.map(m => {
+    const isAdmin = m.sender === 'admin';
+    return `
+      <div class="flex ${isAdmin ? 'justify-end' : 'justify-start'}">
+        <div class="max-w-[75%] ${isAdmin ? 'bg-burgundy text-white' : 'bg-gold/20 text-charcoal'} rounded-xl px-4 py-2 text-sm">
+          ${m.text}
+        </div>
+      </div>
+    `;
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+async function sendAdminReply(){
+  if(!activeChatId) return;
+  const input = document.getElementById('admin-reply-input');
+  const text = input.value.trim();
+  if(!text) return;
+
+  const { db, doc, updateDoc, arrayUnion, serverTimestamp } = window._firebase;
+  const message = { sender: 'admin', text, timestamp: Date.now() };
+
+  try {
+    await updateDoc(doc(db, 'chats', activeChatId), {
+      messages: arrayUnion(message),
+      lastMessageAt: serverTimestamp(),
+      unreadByCustomer: true
+    });
+    input.value = '';
+  } catch(err){
+    console.error(err);
+    showToast('Could not send reply: ' + err.message, true);
+  }
+}
+</script>
+
+</body>
+</html>
