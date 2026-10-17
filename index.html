@@ -1191,13 +1191,18 @@ document.addEventListener('DOMContentLoaded', () => { updateCartCount(); updateW
 </script>
 
 
+
+
+
+
+
 <!-- PWA Install Button -->
 <button id="pwa-install-btn" class="fixed bottom-24 right-5 z-[90] bg-burgundy text-white px-5 py-3 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 hover:bg-[#5a101c] transition">
   <i class="fa-solid fa-download"></i> <span id="pwa-btn-text">Install App</span>
 </button>
 
 <script>
-// ========== PWA INSTALL (Improved) ==========
+// ========== PWA INSTALL ==========
 let deferredPrompt = null;
 const installBtn = document.getElementById('pwa-install-btn');
 const btnText = document.getElementById('pwa-btn-text');
@@ -1208,59 +1213,48 @@ function isStandalone() {
          document.referrer.includes('android-app://');
 }
 
-// Hide immediately if already installed
 if (isStandalone()) {
   installBtn.style.display = 'none';
 }
 
-// Listen for the install prompt (Chrome, Edge, Samsung Internet, etc.)
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
   installBtn.style.display = 'flex';
   btnText.textContent = 'Install App';
-  console.log('PWA: beforeinstallprompt fired – Install button ready');
+  console.log('PWA: Install prompt ready');
 });
 
-// Handle button click
 installBtn.addEventListener('click', async () => {
   if (deferredPrompt) {
-    // Native install prompt available
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    console.log('PWA install outcome:', outcome);
+    console.log('Install outcome:', outcome);
     if (outcome === 'accepted') {
       installBtn.style.display = 'none';
     }
     deferredPrompt = null;
   } else {
-    // Fallback for iOS / browsers without beforeinstallprompt
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     if (isIOS) {
-      alert('To install:
-1. Tap the Share button (□↑)
-2. Scroll and tap "Add to Home Screen"');
+      alert('To install this app:\n\n1. Tap the Share button (square with arrow)\n2. Scroll down and tap Add to Home Screen');
     } else {
-      alert('To install this app:
-• On Chrome: Menu (⋮) → "Install Muna Mall" or "Add to Home screen"
-• On other browsers: look for Install / Add to Home Screen in the menu');
+      alert('To install this app:\n\n- Chrome: Menu (three dots) then Install App or Add to Home screen\n- Other browsers: Look for Install or Add to Home Screen in the menu');
     }
   }
 });
 
-// Hide after successful install
 window.addEventListener('appinstalled', () => {
-  console.log('PWA: App was installed');
+  console.log('App installed');
   installBtn.style.display = 'none';
   deferredPrompt = null;
 });
 
-// Register Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('Service Worker registered', reg.scope))
-      .catch(err => console.error('Service Worker registration failed:', err));
+      .then(reg => console.log('Service Worker registered'))
+      .catch(err => console.error('SW failed:', err));
   });
 }
 </script>
