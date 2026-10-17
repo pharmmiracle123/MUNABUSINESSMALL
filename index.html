@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Muna Business Mall | Fresh Food Provisions</title>
 
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#6E1423">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Muna Mall">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://js.paystack.co/v1/inline.js"></script>
@@ -1192,49 +1192,75 @@ document.addEventListener('DOMContentLoaded', () => { updateCartCount(); updateW
 
 
 <!-- PWA Install Button -->
-<button id="pwa-install-btn" class="hidden fixed bottom-24 right-5 z-[90] bg-burgundy text-white px-5 py-3 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 hover:bg-[#5a101c] transition">
-  <i class="fa-solid fa-download"></i> Install App
+<button id="pwa-install-btn" class="fixed bottom-24 right-5 z-[90] bg-burgundy text-white px-5 py-3 rounded-full shadow-lg font-semibold text-sm flex items-center gap-2 hover:bg-[#5a101c] transition">
+  <i class="fa-solid fa-download"></i> <span id="pwa-btn-text">Install App</span>
 </button>
 
-
 <script>
-// ========== PWA INSTALL ==========
+// ========== PWA INSTALL (Improved) ==========
 let deferredPrompt = null;
 const installBtn = document.getElementById('pwa-install-btn');
+const btnText = document.getElementById('pwa-btn-text');
 
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || 
+         window.navigator.standalone === true ||
+         document.referrer.includes('android-app://');
+}
+
+// Hide immediately if already installed
+if (isStandalone()) {
+  installBtn.style.display = 'none';
+}
+
+// Listen for the install prompt (Chrome, Edge, Samsung Internet, etc.)
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredPrompt = e;
-  // Only show if not already installed
-  if (!window.matchMedia('(display-mode: standalone)').matches && !navigator.standalone) {
-    installBtn.classList.remove('hidden');
-  }
+  installBtn.style.display = 'flex';
+  btnText.textContent = 'Install App';
+  console.log('PWA: beforeinstallprompt fired – Install button ready');
 });
 
+// Handle button click
 installBtn.addEventListener('click', async () => {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  const { outcome } = await deferredPrompt.userChoice;
-  if (outcome === 'accepted') {
-    installBtn.classList.add('hidden');
+  if (deferredPrompt) {
+    // Native install prompt available
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('PWA install outcome:', outcome);
+    if (outcome === 'accepted') {
+      installBtn.style.display = 'none';
+    }
+    deferredPrompt = null;
+  } else {
+    // Fallback for iOS / browsers without beforeinstallprompt
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIOS) {
+      alert('To install:
+1. Tap the Share button (□↑)
+2. Scroll and tap "Add to Home Screen"');
+    } else {
+      alert('To install this app:
+• On Chrome: Menu (⋮) → "Install Muna Mall" or "Add to Home screen"
+• On other browsers: look for Install / Add to Home Screen in the menu');
+    }
   }
-  deferredPrompt = null;
 });
 
+// Hide after successful install
 window.addEventListener('appinstalled', () => {
-  installBtn.classList.add('hidden');
+  console.log('PWA: App was installed');
+  installBtn.style.display = 'none';
   deferredPrompt = null;
 });
-
-// Hide button if already running as installed PWA
-if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone) {
-  installBtn.classList.add('hidden');
-}
 
 // Register Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('Service Worker registered', reg.scope))
+      .catch(err => console.error('Service Worker registration failed:', err));
   });
 }
 </script>
